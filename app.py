@@ -1,28 +1,76 @@
 import os.path
 import werkzeug.utils
-from flask import Flask, request, session, url_for, redirect
+from flask import Flask, request, session, url_for, redirect, jsonify
 import flask
+from flask_jwt_extended import (
+    JWTManager, create_access_token, jwt_required, get_jwt_identity, set_access_cookies, unset_jwt_cookies,
+    create_refresh_token, set_refresh_cookies
+)
 
 app = Flask(__name__)
 upload_folder = "uploads"
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "pdf", "txt"}
 
+app.config["JWT_SECRET_KEY"] = "insecure_secret_key"
+app.config["JWT_TOKEN_LOCATION"] = "cookies"
+app.config["JWT_COOKIE_SECURE"] = True
+app.config["JWT_COOKIE_CSRF_PROTECT"] = True
+jwt = JWTManager(app)
 
 if app.secret_key is None:
     app.secret_key = os.urandom(20)
 
 
-@app.route('/logedin')
-def logedin():
+@app.route("/login_jwt", methods=["GET", "POST"])
+def login():
+    if request.method == "GET":
+        return flask.render_template("login.html")
+    username = request.form.get("username", None)
+    password = request.form.get("password", None)
+    if username != "my-user" or password != "my-key":
+        return jsonify({"msg": "Bad username or password"}), 401
+
+    access_token = create_access_token(identity=username)
+    refresh_token = create_refresh_token(identity=username)
+    resp = jsonify(login=True)
+    set_access_cookies(resp, access_token)
+    set_refresh_cookies(resp, refresh_token)
+    return resp
+
+@app.route("/refresh_jwt")
+@jwt_required(refresh=True)
+def refresh_jwt():
+    user = get_jwt_identity()
+    access_token = create_access_token(identity=user)
+    resp = jsonify(refresh=True)
+    set_access_cookies(resp, access_token)
+    return resp
+
+@app.route("/protected_jwt", methods=["GET"])
+@jwt_required()
+def protected():
+    # Access the identity of the current user with get_jwt_identity
+    current_user = get_jwt_identity()
+    return jsonify(logged_in_as=current_user), 200
+
+@app.route("/logout_jwt")
+def logout_jwt():
+    resp = jsonify({"logout": True})
+    unset_jwt_cookies(resp)
+    return resp
+
+
+@app.route('/logedin_session')
+def logedin_session():
     if 'username' in session:
         return f'Logged in as {session["username"]}'
     return 'You are not logged in'
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
+@app.route('/login_session', methods=['GET', 'POST'])
+def login_session():
     if request.method == 'POST':
         session['username'] = request.form['username']
-        return redirect(url_for('logedin'))
+        return redirect(url_for('logedin_session'))
     return '''
         <form method="post">
             <p><input type=text name=username>
@@ -30,11 +78,11 @@ def login():
         </form>
     '''
 
-@app.route('/logout')
-def logout():
+@app.route('/logout_session')
+def logout_session():
     # remove the username from the session if it's there
     session.pop('username', None)
-    return redirect(url_for('logedin'))
+    return redirect(url_for('logedin_session'))
 
 
 def allowed(filename):
@@ -86,8 +134,8 @@ def login_form2():
     return flask.make_response(flask.render_template("index.html"))
 
 
-@app.route('/login2', methods=["POST", "GET"])
-def login2():
+@app.route('/login_cookie', methods=["POST", "GET"])
+def login_cookie():
     cookie_username = request.cookies.get("username")
     if cookie_username is not None:
         return f"Hello from the cookie {cookie_username}"
