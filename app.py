@@ -4,7 +4,7 @@ from flask import Flask, request, session, url_for, redirect, jsonify
 import flask
 from flask_jwt_extended import (
     JWTManager, create_access_token, jwt_required, get_jwt_identity, set_access_cookies, unset_jwt_cookies,
-    create_refresh_token, set_refresh_cookies
+    create_refresh_token, set_refresh_cookies, get_jwt, get_csrf_token
 )
 
 app = Flask(__name__)
@@ -51,7 +51,12 @@ def refresh_jwt():
 def protected():
     # Access the identity of the current user with get_jwt_identity
     current_user = get_jwt_identity()
-    return jsonify(logged_in_as=current_user), 200
+    jwt_token = get_jwt()
+    csrf_token = jwt_token["csrf"]
+    csrf_cookie = request.cookies.get("csrf_access_token")
+    csrf_header = request.headers.get("X-CSRF-TOKEN")
+    return jsonify({"logged_in_as":current_user, "jwt_csrf_token":csrf_token, "cookie_csrf_token": csrf_cookie,
+                    "header_csrf_token": csrf_header}), 200 
 
 @app.route("/logout_jwt")
 def logout_jwt():
