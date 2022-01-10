@@ -46,6 +46,12 @@ def refresh_jwt():
     set_access_cookies(resp, access_token)
     return resp
 
+def check_csrf_header(request):
+    csrf_token = get_jwt()["csrf"]
+    csrf_header = request.headers.get("X-CSRF-TOKEN")
+    return csrf_header == csrf_token
+
+
 @app.route("/protected_jwt", methods=["GET"])
 @jwt_required()
 def protected():
@@ -53,10 +59,10 @@ def protected():
     current_user = get_jwt_identity()
     jwt_token = get_jwt()
     csrf_token = jwt_token["csrf"]
-    csrf_cookie = request.cookies.get("csrf_access_token")
     csrf_header = request.headers.get("X-CSRF-TOKEN")
-    return jsonify({"logged_in_as":current_user, "jwt_csrf_token":csrf_token, "cookie_csrf_token": csrf_cookie,
-                    "header_csrf_token": csrf_header}), 200 
+    csrf_header_set = check_csrf_header(request)
+    return jsonify({"logged_in_as": current_user, "jwt_csrf_token":csrf_token, "header_csrf_token": csrf_header,
+                    "csrf_authenticated": csrf_header_set}), 200
 
 @app.route("/logout_jwt")
 def logout_jwt():
