@@ -1,2 +1,2 @@
 # Flask
-Simple Web Application to learn Flask.
+A Simple Web Application.
