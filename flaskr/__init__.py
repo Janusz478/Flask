@@ -33,4 +33,14 @@ def create_app(test_config=None):
     app.register_blueprint(page2)
     jwt.init_app(app)
 
+    from . import db
+    db.init_app(app)
+
+    from . import auth
+    app.register_blueprint(auth.bp)
+
+    from . import blog
+    app.register_blueprint(blog.bp)
+    app.add_url_rule('/', endpoint='index')
+
     return app
